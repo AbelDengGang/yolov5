@@ -42,7 +42,9 @@ import org.junit.runner.RunWith;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.tflite.Classifier;
 import org.tensorflow.lite.examples.detection.tflite.Classifier.Recognition;
-import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
+import org.tensorflow.lite.examples.detection.tflite.YoloV5Classifier;
+import org.tensorflow.lite.examples.detection.tflite.YoloV5ClassifierDetect;
+//import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 
 /** Golden test for Object Detection Reference app. */
 @RunWith(AndroidJUnit4.class)
@@ -63,13 +65,21 @@ public class DetectorTest {
   public void setUp() throws IOException {
     AssetManager assetManager =
         InstrumentationRegistry.getInstrumentation().getContext().getAssets();
+//    detector =
+//            TFLiteObjectDetectionAPIModel.create(
+//            assetManager,
+//            MODEL_FILE,
+//            LABELS_FILE,
+//            MODEL_INPUT_SIZE,
+//            IS_MODEL_QUANTIZED);
+    // 原来的TFLiteObjectDetectionAPIModel找不到，用YoloV5Classifier代替，可以build apk
     detector =
-        TFLiteObjectDetectionAPIModel.create(
-            assetManager,
-            MODEL_FILE,
-            LABELS_FILE,
-            MODEL_INPUT_SIZE,
-            IS_MODEL_QUANTIZED);
+            YoloV5Classifier.create(assetManager,
+                    MODEL_FILE,
+                    LABELS_FILE,
+                    IS_MODEL_QUANTIZED,
+                    MODEL_INPUT_SIZE
+                    );
     int cropSize = MODEL_INPUT_SIZE;
     int previewWidth = IMAGE_SIZE.getWidth();
     int previewHeight = IMAGE_SIZE.getHeight();
