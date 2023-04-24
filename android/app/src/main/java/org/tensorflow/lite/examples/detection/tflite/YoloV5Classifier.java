@@ -21,6 +21,9 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.util.Log;
 
+import com.esotericsoftware.yamlbeans.YamlException;
+import com.esotericsoftware.yamlbeans.YamlReader;
+
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
 import org.tensorflow.lite.examples.detection.MainActivity;
@@ -30,6 +33,7 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -56,6 +60,124 @@ import java.util.Vector;
 public class YoloV5Classifier implements Classifier {
 
     /**
+     * load labels from dataset yaml in to a string vector
+     *
+     * @param datasetFilename The filepath of dataset, such as coco.yaml.
+     * @param labels labels will be add to the vector.
+     */
+    public static void loadLabelsFromYaml(final AssetManager assetManager, final String datasetFilename,Vector<String> labels){
+        try{
+            YamlReader reader = null;
+            InputStream labelsInput = assetManager.open(datasetFilename);
+            BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
+            String line;
+
+            reader = new YamlReader(new InputStreamReader(labelsInput));
+            Object object = reader.read();
+            Map map = (Map)object;
+            Map names = (Map) map.get("names");
+            int name_size = names.size();
+            Log.e("YoloV5Classifier","label count = " + name_size);
+            Object keys = names.keySet();
+            for(int i= 0;i<name_size;i++){
+                String label = (String)names.get(Integer.toString(i));
+                Log.e("YoloV5Classifier",i + " " + (String)names.get(Integer.toString(i)));
+                labels.add(label);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+    /**
+     * Initializes a native TensorFlow session for classifying images from yaml.
+     *
+     * @param assetManager  The asset manager to be used to load assets.
+     * @param modelFilename The filepath of the model GraphDef protocol buffer,such as yolov5s-coco-int8-320.tflite.
+     * @param datasetFilename The filepath of dataset, such as coco.yaml.
+     * @param modelConfigFilename The filepath of the model config yaml file, such as yolov5s-coco.yaml.
+     * @param isQuantized   Boolean representing model is quantized or not
+     */
+    public static YoloV5Classifier createFromYaml(
+            final AssetManager assetManager,
+            final String modelFilename,
+            final String datasetFilename,
+            final String modelConfigFilename,
+            final boolean isQuantized,
+            final int inputSize
+            /*final int[] output_width,
+            final int[][] masks,
+            final int[] anchors*/)
+            throws IOException {
+        final YoloV5Classifier d = new YoloV5Classifier();
+
+        loadLabelsFromYaml(assetManager, datasetFilename,d.labels);
+        try {
+            Interpreter.Options options = (new Interpreter.Options());
+            options.setNumThreads(NUM_THREADS);
+            if (isNNAPI) {
+                d.nnapiDelegate = null;
+                // Initialize interpreter with NNAPI delegate for Android Pie or above
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    d.nnapiDelegate = new NnApiDelegate();
+                    options.addDelegate(d.nnapiDelegate);
+                    options.setNumThreads(NUM_THREADS);
+//                    options.setUseNNAPI(false);
+//                    options.setAllowFp16PrecisionForFp32(true);
+//                    options.setAllowBufferHandleOutput(true);
+                    options.setUseNNAPI(true);
+                }
+            }
+            if (isGPU) {
+                GpuDelegate.Options gpu_options = new GpuDelegate.Options();
+                gpu_options.setPrecisionLossAllowed(true); // It seems that the default is true
+                gpu_options.setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED);
+                d.gpuDelegate = new GpuDelegate(gpu_options);
+                options.addDelegate(d.gpuDelegate);
+            }
+            d.tfliteModel = Utils.loadModelFile(assetManager, modelFilename);
+            d.tfLite = new Interpreter(d.tfliteModel, options);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        d.isModelQuantized = isQuantized;
+        // Pre-allocate buffers.
+        int numBytesPerChannel;
+        if (isQuantized) {
+            numBytesPerChannel = 1; // Quantized
+        } else {
+            numBytesPerChannel = 4; // Floating point
+        }
+        d.INPUT_SIZE = inputSize;
+        d.imgData = ByteBuffer.allocateDirect(1 * d.INPUT_SIZE * d.INPUT_SIZE * 3 * numBytesPerChannel);
+        d.imgData.order(ByteOrder.nativeOrder());
+        d.intValues = new int[d.INPUT_SIZE * d.INPUT_SIZE];
+
+        d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
+//        d.OUTPUT_WIDTH = output_width;
+//        d.MASKS = masks;
+//        d.ANCHORS = anchors;
+        if (d.isModelQuantized){
+            Tensor inpten = d.tfLite.getInputTensor(0);
+            d.inp_scale = inpten.quantizationParams().getScale();
+            d.inp_zero_point = inpten.quantizationParams().getZeroPoint();
+            Tensor oupten = d.tfLite.getOutputTensor(0);
+            d.oup_scale = oupten.quantizationParams().getScale();
+            d.oup_zero_point = oupten.quantizationParams().getZeroPoint();
+        }
+
+        int[] shape = d.tfLite.getOutputTensor(0).shape();
+        int numClass = shape[shape.length - 1] - 5;
+        d.numClass = numClass;
+        d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel);
+        d.outData.order(ByteOrder.nativeOrder());
+        return d;
+    }
+
+
+
+    /**
      * Initializes a native TensorFlow session for classifying images.
      *
      * @param assetManager  The asset manager to be used to load assets.
@@ -74,7 +196,6 @@ public class YoloV5Classifier implements Classifier {
             final int[] anchors*/)
             throws IOException {
         final YoloV5Classifier d = new YoloV5Classifier();
-
         String actualFilename = labelFilename.split("file:///android_asset/")[1];
         InputStream labelsInput = assetManager.open(actualFilename);
         BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));

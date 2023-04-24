@@ -27,29 +27,58 @@ public class DetectorFactory {
         int[][] masks = new int[][]{{0}};
         int[] anchors = new int[]{0};
 
-        try{
-            YamlReader reader = null;
-            InputStream labelsInput = assetManager.open("coco.yaml");
-            BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
-            String line;
+//        try{
+//            YamlReader reader = null;
+//            InputStream labelsInput = assetManager.open("coco.yaml");
+//            BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
+//            String line;
+//
+//            reader = new YamlReader(new InputStreamReader(labelsInput));
+//            Object object = reader.read();
+//            Map map = (Map)object;
+//            //String ret =(String) map.get("path");
+//            Log.e("aaaa","path" + (String) map.get("path"));
+//            Map names = (Map) map.get("names");
+//            int name_size = names.size();
+//            Log.e("aaaa","name count = " + name_size);
+//            Object keys = names.keySet();
+//            for(int i= 0;i<name_size;i++){
+//                Log.e("aaaa",i + " " + (String)names.get(Integer.toString(i)));
+//            }
+//            Log.e("aaaa","aaa");
+//        } catch (FileNotFoundException | YamlException e) {
+//            e.printStackTrace();
+//        }
 
-            reader = new YamlReader(new InputStreamReader(labelsInput));
-            Object object = reader.read();
-            Map map = (Map)object;
-            //String ret =(String) map.get("path");
-            Log.e("aaaa","path" + (String) map.get("path"));
-            Map names = (Map) map.get("names");
-            int name_size = names.size();
-            Log.e("aaaa","name count = " + name_size);
-            Object keys = names.keySet();
-            for(int i= 0;i<name_size;i++){
-                Log.e("aaaa",i + " " + (String)names.get(Integer.toString(i)));
+        if(!(modelFilename.equals("yolov5s.tflite") || modelFilename.equals("yolov5s-fp16.tflite") || modelFilename.equals("yolov5s-int8.tflite"))){
+            /*
+            默认的3个文件用coco数据集，其他的模型文件的命名格式要符合 model_name-datatype-size.tflite 格式
+            model_name 的第二个字段是数据集的名称,比如yolov5s-coco-int8-320.tflite, 会用 yolov5s-coco.yaml 作为模型定义文件，用 coco.yaml 作为数据集，coco.yaml 中读取标签
+             */
+            try {
+                int lastDotIndex = modelFilename.lastIndexOf(".");
+                String modelFilenameWithoutExtension = modelFilename.substring(0, lastDotIndex);
+                String[] tags = modelFilenameWithoutExtension.split("-");
+                String sizeTag = tags[3];
+                inputSize = Integer.parseInt(sizeTag);
+                String dataTag = tags[2];
+                String dataSetTag = tags[1];
+                String yamlDataSet = dataSetTag + ".yaml";
+                String yamlModel = tags[0] + "-" + tags[1] + ".yaml";
+                if (dataTag.equals("int8")){
+                    isQuantized = true;
+                }else{
+                    isQuantized = false;
+                }
+                Log.i("DetectorFactory", modelFilename + ": create information:" + yamlModel +" " + yamlDataSet + " " + inputSize + " isQuantized: "+isQuantized);
+                return YoloV5Classifier.createFromYaml(assetManager, modelFilename, yamlDataSet, yamlModel,isQuantized,
+                        inputSize);
+            }catch (Exception e){
+                Log.e("DetectorFactory",e.getMessage());
+                e.printStackTrace();
+
             }
-            Log.e("aaaa","aaa");
-        } catch (FileNotFoundException | YamlException e) {
-            e.printStackTrace();
         }
-
         if (modelFilename.equals("yolov5s.tflite")) {
             labelFilename = "file:///android_asset/coco.txt";
             isQuantized = false;
