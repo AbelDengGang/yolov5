@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="picture_source">
+        <item>local Cam</item>
+        <item>assert picture</item>
+        <item>other picture</item>
+        <item>network</item>
+    </string-array>
+</resources>

@@ -30,6 +30,9 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -39,6 +42,7 @@ import java.util.List;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
 import org.tensorflow.lite.examples.detection.env.BorderedText;
+import org.tensorflow.lite.examples.detection.env.GlobalConfig;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
 import org.tensorflow.lite.examples.detection.tflite.Classifier;
@@ -79,6 +83,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     private MultiBoxTracker tracker;
 
     private BorderedText borderedText;
+
+    private Spinner sp_source;
 
     @Override
     public void onPreviewSizeChosen(final Size size, final int rotation) {
@@ -139,6 +145,21 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 });
 
         tracker.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+
+        sp_source = (Spinner) findViewById((R.id.sp_source));
+        sp_source.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+//                LOGGER.e(String.valueOf(sp_source.getSelectedItemId()));
+//                sp_source.getSelectedItemPosition();
+                GlobalConfig.setInputSourceType((sp_source.getSelectedItemPosition()));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
     }
 
     protected void updateActiveModel() {
@@ -223,6 +244,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             readyForNextImage();
             return;
         }
+        LOGGER.e("Source Type:" + String.valueOf(GlobalConfig.getInputSourceType()));
         computingDetection = true;
         LOGGER.i("Preparing image " + currTimestamp + " for detection in bg thread.");
 
