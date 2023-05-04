@@ -17,8 +17,10 @@
 package org.tensorflow.lite.examples.detection;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.hardware.Camera;
@@ -105,6 +107,14 @@ public abstract class CameraActivity extends AppCompatActivity
 
   ArrayList<String> deviceStrings = new ArrayList<String>();
 
+  private boolean checkGLVersion(){
+    ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+    ConfigurationInfo ci = am.getDeviceConfigurationInfo();
+    LOGGER.i("opengles version is :" + Integer.toHexString(ci.reqGlEsVersion));
+    return ci.reqGlEsVersion >= 0x30200; // TFLITE GPU backend need opengles 3.2 +
+  }
+
+
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     LOGGER.d("onCreate " + this);
@@ -116,6 +126,7 @@ public abstract class CameraActivity extends AppCompatActivity
     setSupportActionBar(toolbar);
     getSupportActionBar().setDisplayShowTitleEnabled(false);
 
+    checkGLVersion();
     if (hasPermission()) {
       setFragment();
     } else {
@@ -475,6 +486,9 @@ public abstract class CameraActivity extends AppCompatActivity
         final CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
 
         // We don't use a front facing camera in this sample.
+        // 不使用前置摄像头，可以使用后置摄像头或者外置摄像头
+        // 如果在使用外置摄像头的时候，useCamera2API =  true
+        // 如果在使用后置摄像头的时候，INFO_SUPPORTED_HARDWARE_LEVEL_FULL ，useCamera2API =  true
         final Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
         if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
           continue;
